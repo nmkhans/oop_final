@@ -1,6 +1,230 @@
-from user import User
-from admin import Admin
-from bank import Bank
+import random
+from datetime import datetime
+
+# All classes
+
+class Bank:
+  def __init__(self, name, initial_balance):
+    self.name = name
+    self.balance = initial_balance
+    self.total_loan = 0
+    self.users = []
+    self.admins = []
+    self.loan_taken = {} # {"moin": 2}
+    self.__loan_feature = True
+
+  def add_user(self, user):
+    self.users.append(user)
+
+  def grant_loan(self, user, amount):
+    if self.__loan_feature == False:
+      print("Loan is not available at this moment.")
+      return
+
+    if amount <= self.balance:
+      if self.loan_taken.get(user.name):
+        if self.loan_taken.get(user.name) < 2:
+          self.loan_taken[user.name] += 1
+          self.balance -= amount
+          user.balance += amount
+          self.total_loan += amount
+
+          print(f"{amount} Money has been taken loan.")
+          return True
+        else:
+          print("Loan taking has reached its limit. Repay first two loan")
+      else:
+        self.loan_taken[user.name] = 1
+        self.balance -= amount
+        user.balance += amount
+        self.total_loan += amount
+
+        print(f"{amount} Money has been taken loan.")
+        return True
+    else:
+      print("Your request amount exceeded banks balance")
+
+  def check_loan_taken_list(self):
+    for keys, values in self.loan_taken.items():
+      print(f"Name: {keys}, taken: {values} times")
+
+  @property
+  def loan_feature(self):
+    print(self.__loan_feature)
+
+  @loan_feature.setter
+  def loan_feature(self, decision):
+    self.__loan_feature = decision
+
+
+class Person:
+  def __init__(self, name, email, password, address):
+    self.name = name
+    self.email = email
+    self.password = password
+    self.address = address
+
+class Transaction:
+  def __init__(self, type, amount, date):
+    self.type = type
+    self.amount = amount
+    self.date = date
+
+class Admin(Person):
+  def __init__(self, name, email, password, address, bank):
+    super().__init__(name, email, password, address)
+    self.account_status = "admin"
+    self.bank = bank
+
+  def create_account(self, name, email, password, address, acc_type):
+    user = User(name, email, password, address, acc_type, self.bank)
+    self.bank.users.append(user)
+
+  def delete_user(self, name):
+    user = {}
+
+    for person in self.bank.users:
+      if person.name.lower() == name.lower():
+        user = person
+        break
+
+    if user == {}:
+      print("No user found!")
+      return
+    
+    self.bank.users.remove(user)
+    print("User has been deleted!")
+
+  def user_account_list(self):
+    if self.bank.users != []:
+      print("Name:\tBalance: Acc_type: Loan taken:")
+
+      for person in self.bank.users:
+        print(f"{person.name}\t{person.balance}\t{person.account_type}\t{self.bank.loan_taken.get(person.name) and self.bank.loan_taken.get(person.name) or "No"}")
+    else:
+      print("No users available!")
+
+  def admin_list(self):
+    print("Name:\tEmail:")
+
+    for person in self.bank.admins:
+      print(f"{person.name}\t{person.email}")
+
+  def check_total_balance(self):
+    print(f"Bank name: {self.bank.name}, Total balance: {self.bank.balance} ")
+
+  def check_total_loan_amount(self):
+    print(f"Bank name: {self.bank.name}, Total loan on pending: {self.bank.total_loan} ")
+
+  def toggle_loan_feture(self, decision):
+    self.bank.loan_feature = decision
+
+class User(Person):
+  def __init__(self, name, email, password, address, account_type, bank):
+    super().__init__(name, email, password, address)
+    self.account_type = account_type
+    self.balance = 0
+    self.account_no = self.gen_acc_no()
+    self.bank = bank
+    self.transaction_history = []
+
+  def gen_acc_no(self):
+    list_of_word = {
+      0: "a",
+      1: "b",
+      2: "c",
+      3: "d",
+      4: "e",
+      5: "f",
+      6: "g",
+      7: "h",
+      8: "i",
+      9: "j",
+    }
+
+    acc_no = ""
+    while len(acc_no) < 5:
+      random_char = random.randint(0, 9)
+      if list_of_word[random_char] not in acc_no:
+        acc_no += list_of_word[random_char]
+
+    return acc_no
+
+  def deposit_amount(self, amount):
+    if amount > 0:
+      self.balance += amount
+      self.bank.balance += amount
+
+      transaction = Transaction("deposit", amount, datetime.now())
+      self.transaction_history.append(transaction)
+
+      print(f"{amount} money has been added into your balance.")
+    else:
+      print("Invalid deposit amount!")
+      return
+
+  def withdraw_amount(self, amount):
+    if self.bank.balance == 0:
+      print("The bank is bankrupted!")
+      return
+    elif amount > self.bank.balance:
+      print("Invalid withdraw amount!")
+      return
+    
+    if amount <= self.balance:
+      self.balance -= amount
+      self.bank.balance -= amount
+
+      transaction = Transaction("withdraw", amount, datetime.now())
+      self.transaction_history.append(transaction)
+
+      print(f"{amount} money has been withdrawed.")
+    else:
+      print("Withdrawal amount exceeded")
+      return
+    
+  def check_balance(self):
+    print(f"Your current balance is: {self.balance}")
+  
+  def check_transaction_history(self):
+    if self.transaction_history:
+      for history in self.transaction_history:
+        print(f"Date: {history.date}")
+        print(f"Transaction type: {history.type} Amount: {history.amount}")
+    else:
+      print("No history available!")
+
+  def take_loan(self, amount):
+    loan = self.bank.grant_loan(self, amount)
+
+    if loan:
+      transaction = Transaction("loan taken", amount, datetime.now())
+      self.transaction_history.append(transaction)
+
+  def transfer_balance(self, name, amount):
+    reciver = {}
+
+    for person in self.bank.users:
+      if person.name.lower() == name.lower():
+        reciver = person
+        break
+
+    if reciver == {}:
+      print("Account does not exist!")
+      return   
+    
+    if amount <= self.balance:
+      reciver.balance += amount
+      self.balance -= amount
+
+      transaction = Transaction("balance transfered", amount, datetime.now())
+      self.transaction_history.append(transaction)
+
+      print("Money Transfer successfull")
+    else:
+      print("Transfer request exceeded from balance!")
+    
+
 
 
 dutch_bangla = Bank("Dutch Bangla", 50000)
